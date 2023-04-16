@@ -1,35 +1,25 @@
-stm32f407g-disc
-===============
+# Read here first
 
-_stm32f407g-disc_ contains a basic board support package for the
-[STM32F407G-DISC][] microcontroller board (also known as STM32F4DISCOVERY, but
-easy to confuse with other STM32F4 discovery boards which also exist) to write
-firmwares using the Rust language. This experimentation board features multiple
-user programmable LEDs an accelerometer, an audio DAC with amplified, a
-microphone jack, a microphone and a user programmable USB connector. A shield
-with breakout for Ethernet, RS232 serial port, SD-Card reader, and LCD
-connector is also available.
+Display driver for a SSD2119 display controller using Rust on the STM32F407G-DISC1 board.
 
-It also contains a (non-removable) capable ST-Link V2 debugging interface.
+### Building the examples:
+----------------------
 
-[STM32F407G-DISC]: https://www.st.com/en/evaluation-tools/stm32f4discovery.html
+The display example can be built with `cargo`:
 
-Programming
------------
+    $ cargo build --release --example display
 
-Several methods for programming exist. If the ST-Link on your board has a recent firmware (can be updated e.g. via [ST-LINK utility](https://www.st.com/en/development-tools/stsw-link004.html)), we recommend the use of [cargo-embed](https://github.com/probe-rs/cargo-embed):
+### Flashing the examples:
+----------------------
 
-```sh
-cargo embed --example=mems
-```
+- Plug in the board via USB. The board should show up as a USB mass storage device.
+- Drag and drop the binary file from the `target` directory to mounted directory of the board.
+- The binary should be at `target/thumbv7em-none-eabihf/release/examples/display`.
+- The round multi LED near the USB connector should start blinking. When it stops blinking, the binary has been flashed. 
+- Unplug the board and plug it back in. The flashed binary should now be running.
 
-(`cargo embed` doesn't support ITM at the moment.)
-
-Otherwise this repo also contains config files for [OpenOCD](http://openocd.org/).
-
-Debugging in [VSCode](https://code.visualstudio.com/docs/editor/debugging) with [Cortex Debug](https://github.com/Marus/cortex-debug) is supported.
-
-License
+### License
 -------
+The same license as the original repository ( https://github.com/stm32-rs/stm32f407g-disc ):
 
 [0-clause BSD license](LICENSE-0BSD.txt).
