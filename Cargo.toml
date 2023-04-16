@@ -1,0 +1,55 @@
+[package]
+edition = "2018"
+authors = ["Daniel Egger <daniel@eggers-club.de>"]
+categories = [
+    "embedded",
+    "no-std",
+]
+description = "Board support crate for the STM32F407G DISCOVERY microcontroller board"
+documentation = "https://docs.rs/crate/stm32f407g-disc"
+keywords = [
+    "arm",
+    "cortex-m",
+    "template",
+]
+license = "0BSD"
+name = "stm32f407g-disc"
+repository = "https://github.com/stm32-rs/stm32f407g-disc"
+version = "0.4.1"
+readme = "README.md"
+
+[package.metadata.docs.rs]
+features = []
+targets = ["thumbv7em-none-eabihf"]
+
+[dependencies]
+accelerometer = "0.11.0"
+cortex-m = "0.7.2"
+cortex-m-rt = "0.6.13"
+lis302dl = "0.1.0"
+
+[dependencies.embedded-hal]
+features = ["unproven"]
+version = "0.2"
+
+[dependencies.stm32f4xx-hal]
+default-features = false
+features = ["rt", "stm32f407"]
+version = "0.9.0"
+
+[dev-dependencies]
+ssd1306 = "0.5.2"
+nb = "1.0"
+panic-halt = "0.2"
+panic-itm = "0.4"
+
+[profile.dev]
+debug = true
+
+[profile.release]
+debug = true
+lto = true
+opt-level = "s"
+
+[dependencies.panic-itm]
+version = "0.4.2"
