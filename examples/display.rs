@@ -14,7 +14,6 @@ use stm32f407g_disc as board;
 use crate::board::{
     hal::stm32,
     hal::{delay::Delay, prelude::*},
-    led::{LedColor, Leds},
 };
 use cortex_m::peripheral::Peripherals;
 use cortex_m_rt::entry;
@@ -75,23 +74,43 @@ fn read_unsafe(gpiox: u32) -> u32 {
 } 
 
 // Toggle a user chosen bit on a GPIO 
-fn toggle_bit_unsafe(gpiox: u32, bit: u8) {
+fn toggle_bit (gpiox: u32, bit: u8) {
     write_unsafe(gpiox, read_unsafe(gpiox) ^ (1 << bit));
 }
 
 // Set a user chosen bit on a GPIO to 1
-fn set_bit_high_unsafe(gpiox: u32, bit: u8) {  
+fn set_bit_high(gpiox: u32, bit: u8) {  
     write_unsafe(gpiox, read_unsafe(gpiox) | (1 << bit));
 }
 
 // Set a user chosen bit on a GPIO to 0
-fn set_bit_low_unsafe(gpiox: u32, bit: u8) {
+fn set_bit_low(gpiox: u32, bit: u8) {
     write_unsafe(gpiox, read_unsafe(gpiox) & !(1 << bit));
 }
 
 // Set a specfific GPIO pin to output mode
-fn set_gpio_output_unsafe(gpiox_moder: u32, pin: u8) {
-   set_bit_high_unsafe(gpiox_moder, pin * 2);
+fn set_gpio_output(gpiox_moder: u32, pin: u8) {
+   set_bit_high(gpiox_moder, pin * 2);
+}
+
+// Set a specfific GPIO pin to input mode
+fn set_gpio_input(gpiox_moder: u32, pin: u8) {
+    set_bit_high(gpiox_moder, pin);
+}
+
+// Use logical AND to set a register
+fn and_register(gpiox: u32, operation: u32) {
+    write_unsafe(gpiox, read_unsafe(gpiox) & operation);
+}
+
+// Use logical OR to set a register
+fn or_register(gpiox: u32, operation: u32) {
+    write_unsafe(gpiox, read_unsafe(gpiox) | operation);
+}
+
+// Toggle register
+fn toggle_register(gpiox: u32, operation: u32) {
+    write_unsafe(gpiox, read_unsafe(gpiox) ^ operation);
 }
 
 ///////////////////////////////////////////
@@ -105,6 +124,153 @@ fn set_gpio_output_unsafe(gpiox_moder: u32, pin: u8) {
 ///////////////////////////////////////////
 
 
+// void  LCD_Output16BitWord(uint16_t data)
+// {
+// 	GPIOD->ODR &= 0x38FC;
+// 	GPIOD->ODR |= ((data & 0xE000)>>5) | ((data & 0x0003)<<14) | ((data & 0x000C)>>2);	
+// 	GPIOE->ODR &= 0x007F;
+// 	GPIOE->ODR |= (data & 0x1FF0)<<3;
+// }
+
+// Ouput 16 bit word to the display
+fn lcd_output_16_bit_word(data: u16) {
+    and_register(GPIOD_ODR, 0x38FC);
+    or_register(GPIOD_ODR, (((data & 0xE000)>>5) | ((data & 0x0003)<<14) | ((data & 0x000C)>>2)).into());
+    and_register(GPIOE_ODR, 0x007F);
+    or_register(GPIOE_ODR, ((data & 0x1FF0)<<3).into());    // NOTE: .into() is done during compile time to convert u16 to u32
+}
+
+// void LCD_WriteData (uint16_t data){
+// 	GPIOD->ODR |= 0x10;		//1<<4;
+// 	GPIOE->ODR |= 0x08;		//1<<3;
+// 	GPIOD->ODR &= 0xFF5F; 	//(D5 & D7 = 0)
+// 	LCD_Output16BitWord(data);
+// 	GPIOD->ODR |= 0x20;		//1<<5;
+// }
+
+// Write data to the display
+fn lcd_write_data (data:u16){
+    or_register(GPIOD_ODR, 0x10); //1<<4;
+    or_register(GPIOE_ODR, 0x08); //1<<3;
+    and_register(GPIOD_ODR, 0xFF5F); //(D5 & D7 = 0)
+    lcd_output_16_bit_word(data);
+    or_register(GPIOD_ODR, 0x20); //1<<5;
+}
+
+// void LCD_WriteCommand (uint16_t cmd){
+// 	GPIOD->ODR |= 0x10;		//1<<4;
+// 	GPIOE->ODR &= 0xFFF7;	//~(1<<3);
+// 	GPIOD->ODR &= 0xFF5F; 	//(D5 & D7 = 0)
+// 	LCD_Output16BitWord(cmd);
+// 	GPIOD->ODR |= 0x20;		//1<<5;
+// }
+
+// Write command to the display
+fn lcd_write_command (cmd:u16){
+    or_register(GPIOD_ODR, 0x10); //1<<4;
+    and_register(GPIOE_ODR, 0xFFF7); //~(1<<3);
+    and_register(GPIOD_ODR, 0xFF5F); //(D5 & D7 = 0)
+    lcd_output_16_bit_word(cmd);
+    or_register(GPIOD_ODR, 0x20); //1<<5;
+}
+
+// Initialize the GPIO pins for the display
+fn lcd_pin_init (delay: &mut Delay){
+    // Set the display ports to output
+    // Control lines
+    // WR:
+    set_bit_high(GPIOD_ODR, 10);
+    // CS:
+    set_bit_high(GPIOD_ODR, 14);
+    // DC:
+    set_bit_high(GPIOE_ODR, 6);
+
+
+    //Set the display ports to input
+    //RD:
+    set_bit_high(GPIOD_MODER, 8);
+
+    //Port D12 auf ausgang schalten
+    set_gpio_output(GPIOD_MODER, 12);
+
+    // data lines
+    set_gpio_output(GPIOD_MODER, 0);
+    set_gpio_output(GPIOD_MODER, 1);
+    set_gpio_output(GPIOD_MODER, 8);
+    set_gpio_output(GPIOD_MODER, 9);
+    set_gpio_output(GPIOD_MODER, 10);
+    set_gpio_output(GPIOD_MODER, 14);
+    set_gpio_output(GPIOD_MODER, 15);
+
+    set_gpio_output(GPIOE_MODER, 7);
+    set_gpio_output(GPIOE_MODER, 8);
+    set_gpio_output(GPIOE_MODER, 9);
+    set_gpio_output(GPIOE_MODER, 10);
+    set_gpio_output(GPIOE_MODER, 11);
+    set_gpio_output(GPIOE_MODER, 12);
+    set_gpio_output(GPIOE_MODER, 13);
+    set_gpio_output(GPIOE_MODER, 14);
+    set_gpio_output(GPIOE_MODER, 15);
+
+
+    set_gpio_output(GPIOD_MODER, 3);
+
+    set_bit_low(GPIOD_ODR, 3);
+    delay.delay_ms(5_u16);
+    set_bit_high(GPIOD_ODR, 3)
+}
+
+// Initialize the display
+fn lcd_init(delay: &mut Delay) {
+    lcd_write_reg(0x0010, 0x0001); // Enter sleep mode
+    lcd_write_reg(0x001E, 0x00B2); // Set initial power parameters.
+    lcd_write_reg(0x0028, 0x0006); // Set initial power parameters.
+    lcd_write_reg(0x0000, 0x0001); // Start the oscillator.
+    lcd_write_reg(0x0001, 0x72EF); // Set pixel format and basic display orientation
+    lcd_write_reg(0x0002, 0x0600);
+    lcd_write_reg(0x0010, 0x0000); // Exit sleep mode.
+    delay.delay_ms(30_u16);       //30ms warten // weniger geht meist auch
+    lcd_write_reg(0x0011, 0x6870); // Configure pixel color format and MCU interface parameters.
+    lcd_write_reg(0x0012, 0x0999); // Set analog parameters 
+    lcd_write_reg(0x0026, 0x3800);
+    lcd_write_reg(0x0007, 0x0033); // Enable the display
+    lcd_write_reg(0x000C, 0x0005); // Set VCIX2 voltage to 6.1V.
+    lcd_write_reg(0x000D, 0x000A); // Configure Vlcd63 and VCOMl 
+    lcd_write_reg(0x000E, 0x2E00);
+    lcd_write_reg(0x0044, (240-1) << 8); // Set the display size and ensure that the GRAM window is set to allow access to the full display buffer.
+    lcd_write_reg(0x0045, 0x0000);
+    lcd_write_reg(0x0046, 320-1);
+    lcd_write_reg(0x004E, 0x0000); // Set cursor to 0,0
+    lcd_write_reg(0x004F, 0x0000);
+}
+
+// Write a command to the display
+fn lcd_write_reg(cmd:u16, data:u16){
+    lcd_write_command(cmd);
+    lcd_write_data(data);
+}
+
+// Set the cursor to a specific x,y position
+fn lcd_set_cursor(x:u16, y:u16){
+    lcd_write_reg(0x004E, x);
+    lcd_write_reg(0x004F, y);
+}
+
+// Set the cursor to a specific x position
+fn lcd_set_cursor_x(x:u16){
+    lcd_write_reg(0x004E, x);
+}
+
+// Set the cursor to a specific y position
+fn lcd_set_cursor_y(y:u16){
+    lcd_write_reg(0x004E, y);
+}
+
+// Draw a pixel at the current cursor position
+fn lcd_draw_pixel(color:u16){
+    lcd_write_reg(0x0022, color);
+}
+
 ///////////////////////////////////////////
 //////    END DISPLAY FUNCTIONS    ////////
 ///////////////////////////////////////////
@@ -116,9 +282,11 @@ fn set_gpio_output_unsafe(gpiox_moder: u32, pin: u8) {
 #[entry]
 fn main() -> ! {
     if let (Some(p), Some(cp)) = (stm32::Peripherals::take(), Peripherals::take()) {
-
-        // Enable GPIOD peripheral clock
+        ////   BASIC SYSTEM SETUP    /////
+        // Enable GPIOD, GPIOE, GPIOB peripheral clock
         let gpiod = p.GPIOD.split();
+        let gpioe = p.GPIOE.split();
+        let gpiob = p.GPIOB.split();
 
         // Constrain clock registers
         let rcc = p.RCC.constrain();
@@ -128,26 +296,20 @@ fn main() -> ! {
 
         // Get delay provider
         let mut delay = Delay::new(cp.SYST, clocks);
-    
-        // GPIO pin setup
 
-        // Über die "offizielle" crate 
-        // let top = gpiod.pd13.into_push_pull_output();
-        // let left = gpiod.pd12.into_push_pull_output();
-        // let right = gpiod.pd14.into_push_pull_output();
-        // let bottom = gpiod.pd15.into_push_pull_output();
+        ////   INIT    /////
+        // Switch on the backlight of the display
+        set_gpio_output(GPIOD_MODER, 13);
+        // Call the GPIO pin init function for the display pins
+        lcd_pin_init(&mut delay);
+        // Call the display init function
+        lcd_init(&mut delay);
 
-        // Setze PD13 als Ausgang
-        set_gpio_output_unsafe(GPIOD_MODER, 13);
-
-        loop {
-            // Schalte PD13 ein
-            toggle_bit_unsafe(GPIOD_ODR, 13);
-
-            // Warte 500ms
-            delay.delay_ms(500_u16);
-        
-        }
+        ////   WRITE TEXT    /////
+        // Set the cursor to the top left corner
+        lcd_set_cursor(0, 0);
+        // Write the text to the display
+        // lcd_write_text("Hello World!", 0x0000, 0xFFFF);
     }
 
     // If we get here, something went terribly wrong
