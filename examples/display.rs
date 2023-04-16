@@ -327,6 +327,15 @@ fn main() -> ! {
         ////   WRITE TEXT    /////
         // Set the cursor to the top left corner
         lcd_set_cursor(0, 0);
+        loop {
+            // Clear the display in white
+            clear_display(0xFFFF);
+            // Wait 2 seconds
+            delay.delay_ms(2000_u16);
+            // Clear the display in blue
+            clear_display(0x001F);
+        }
+
         // Write the text to the display
         // lcd_write_text("Hello World!", 0x0000, 0xFFFF);
     }
