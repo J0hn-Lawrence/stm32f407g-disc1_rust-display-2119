@@ -271,6 +271,26 @@ fn lcd_draw_pixel(color:u16){
     lcd_write_reg(0x0022, color);
 }
 
+fn clear_display (color: u16){
+    and_register(GPIOE_ODR, 0x77);      //FFF7 & 7F = 77 (E3 und alle 16bit wording von E auf Null setzen)
+    and_register(GPIOD_ODR, 0x385C);    //D5 und D7 und 16bit wording D = 0
+
+    or_register(GPIOD_ODR, 0x8000);
+    or_register(GPIOE_ODR, 0x100);      //(0x22 & 0x1FF0)<<3;
+    or_register(GPIOD_ODR, 0x20);
+
+    //farbe
+    or_register(GPIOE_ODR, 0x8);
+    and_register(GPIOD_ODR, 0x385C);    //D5 und D7 und 16bit wording D = 0
+    or_register(GPIOD_ODR, (((color & 0xE000)>>5) | ((color & 0x0003)<<14) | ((color & 0x000C)>>2)).into());
+    and_register(GPIOE_ODR, 0x7F);
+    or_register(GPIOE_ODR, ((color & 0x1FF0)<<3).into());  //+0x8;+E3
+
+    for _pixel in 1..=76800{
+        and_register(GPIOD_ODR, 0xFFDF);    //~(1<<5)
+        or_register(GPIOD_ODR, 0x20);       //1<<5
+    }
+}
 ///////////////////////////////////////////
 //////    END DISPLAY FUNCTIONS    ////////
 ///////////////////////////////////////////
@@ -282,22 +302,21 @@ fn lcd_draw_pixel(color:u16){
 #[entry]
 fn main() -> ! {
     if let (Some(p), Some(cp)) = (stm32::Peripherals::take(), Peripherals::take()) {
-        ////   BASIC SYSTEM SETUP    /////
+        // BASIC GPIO SETUP
         // Enable GPIOD, GPIOE, GPIOB peripheral clock
         let gpiod = p.GPIOD.split();
         let gpioe = p.GPIOE.split();
         let gpiob = p.GPIOB.split();
 
+        // CLOCK SETUP
         // Constrain clock registers
         let rcc = p.RCC.constrain();
-
         // Configure clock to 168 MHz (i.e. the maximum) and freeze it
         let clocks = rcc.cfgr.sysclk(168.mhz()).freeze();
-
         // Get delay provider
         let mut delay = Delay::new(cp.SYST, clocks);
 
-        ////   INIT    /////
+        ////  DISPLAY SETUP    /////
         // Switch on the backlight of the display
         set_gpio_output(GPIOD_MODER, 13);
         // Call the GPIO pin init function for the display pins
