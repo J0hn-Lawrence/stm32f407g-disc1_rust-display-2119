@@ -17,6 +17,7 @@ use crate::board::{
 };
 use cortex_m::peripheral::Peripherals;
 use cortex_m_rt::entry;
+use cortex_m::asm;
 ///////////////////////////////////////////
 ////////       END IMPORTS       //////////
 ///////////////////////////////////////////
@@ -289,7 +290,7 @@ fn clear_display (color: u16){
     for _pixel in 1..=76800{
         and_register(GPIOD_ODR, 0xFFDF);    //~(1<<5)
         // assembly nop
-        
+        asm::nop();
         or_register(GPIOD_ODR, 0x20);       //1<<5
     }
 }
