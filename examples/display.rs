@@ -179,16 +179,16 @@ fn lcd_pin_init (delay: &mut Delay){
     // Set the display ports to output
     // Control lines
     // WR:
-    set_bit_high(GPIOD_ODR, 10);
+    set_gpio_output(GPIOD_MODER, 5);
     // CS:
-    set_bit_high(GPIOD_ODR, 14);
+    set_gpio_output(GPIOD_MODER, 7);
     // DC:
-    set_bit_high(GPIOE_ODR, 6);
+    set_gpio_output(GPIOE_MODER, 3);
 
 
     //Set the display ports to input
     //RD:
-    set_bit_high(GPIOD_MODER, 8);
+    set_gpio_output(GPIOD_MODER, 4);
 
     //Port D12 auf ausgang schalten
     set_gpio_output(GPIOD_MODER, 12);
@@ -288,6 +288,8 @@ fn clear_display (color: u16){
 
     for _pixel in 1..=76800{
         and_register(GPIOD_ODR, 0xFFDF);    //~(1<<5)
+        // assembly nop
+        
         or_register(GPIOD_ODR, 0x20);       //1<<5
     }
 }
@@ -319,6 +321,7 @@ fn main() -> ! {
         ////  DISPLAY SETUP    /////
         // Switch on the backlight of the display
         set_gpio_output(GPIOD_MODER, 13);
+        set_bit_high(GPIOD_ODR, 13);
         // Call the GPIO pin init function for the display pins
         lcd_pin_init(&mut delay);
         // Call the display init function
@@ -327,13 +330,18 @@ fn main() -> ! {
         ////   WRITE TEXT    /////
         // Set the cursor to the top left corner
         lcd_set_cursor(0, 0);
+
         loop {
-            // Clear the display in white
-            clear_display(0xFFFF);
-            // Wait 2 seconds
-            delay.delay_ms(2000_u16);
             // Clear the display in blue
             clear_display(0x001F);
+            // Wait 1 second
+            delay.delay_ms(1000_u16);
+            // Clear the display in white
+            clear_display(0xFFFF);
+            // Wait 1 second
+            delay.delay_ms(1000_u16);
+        
+
         }
 
         // Write the text to the display
